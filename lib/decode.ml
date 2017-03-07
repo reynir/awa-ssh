@@ -40,6 +40,11 @@ let get_version buf =
     else if line_len < 9 then
       error "Version line is too short"
     else
+      (* Strip the comments *)
+      let line = try
+          String.sub line 0 (String.index line ' ')
+        with Not_found -> line
+      in
       let tokens = Str.split_delim (Str.regexp "-") line in
       if List.length tokens <> 3 then
         error "Can't parse version line"
