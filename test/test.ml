@@ -309,7 +309,8 @@ let t_mpint () =
 let t_version () =
   let t = Server.make (Hostkey.Rsa_priv (Nocrypto.Rsa.generate 2048)) [] in
   let client_version = "SSH-2.0-OpenSSH_6.9\r\n" in
-  match Server.pop_msg2 t (Cstruct.of_string client_version) with
+  let t = { t with Server.input_buffer = Cstruct.of_string client_version } in
+  match Server.pop_msg t with
   | Error e -> failwith e
   | Ok (t, msg) ->
     match get_some msg with
@@ -387,20 +388,23 @@ let t_ignore_next_packet () =
   in
   (* Should set ignore_next_packet since the guess of the client is wrong *)
   let message = Ssh.Msg_kexinit kexinit in
-  let buf = encrypt_plain message in
-  let t, message = get_ok (Server.pop_msg2 t buf) in
+  let input_buffer = encrypt_plain message in
+  let t = { t with Server.input_buffer } in
+  let t, message = get_ok (Server.pop_msg t) in
   let message = get_some message in
   let t, _ = get_ok (Server.input_msg t message) in
   assert (t.Server.ignore_next_packet = true);
   (* Should ignore the next packet since ignore_next_packet is true *)
   let message = Ssh.Msg_debug(true, "woop", "Look at me") in
-  let buf = encrypt_plain message in
-  let t, msg = get_ok (Server.pop_msg2 t buf) in
+  let input_buffer = encrypt_plain message in
+  let t = { t with Server.input_buffer } in
+  let t, msg = get_ok (Server.pop_msg t) in
   assert (t.Server.ignore_next_packet = false);
   assert (msg = None);
   (* Should not ignore the packet which follows after *)
-  let buf = encrypt_plain message in
-  let t, msg = get_ok (Server.pop_msg2 t buf) in
+  let input_buffer = encrypt_plain message in
+  let t = { t with Server.input_buffer } in
+  let t, msg = get_ok (Server.pop_msg t) in
   assert (t.Server.ignore_next_packet = false);
   assert (msg = Some message)
 

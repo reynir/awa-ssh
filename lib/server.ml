@@ -102,7 +102,7 @@ let of_new_keys_stoc t =
   let new_keys_stoc = { new_keys_stoc with mac = new_mac_stoc } in
   ok { t with keys_stoc = new_keys_stoc; new_keys_stoc = None }
 
-let pop_msg2 t buf =
+let pop_msg t =
   let version t buf =
     Wire.get_version buf >>= fun (client_version, input_buffer) ->
     match client_version with
@@ -121,10 +121,8 @@ let pop_msg2 t buf =
           if ignore_packet then None else Some msg)
   in
   match t.client_version with
-  | None -> version t buf
-  | Some _ -> decrypt t buf
-
-let pop_msg t = pop_msg2 t t.input_buffer
+  | None -> version t t.input_buffer
+  | Some _ -> decrypt t t.input_buffer
 
 let make_noreply t = ok (t, [])
 let make_reply t msg = ok (t, [ Reply msg ])
