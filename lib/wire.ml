@@ -127,6 +127,18 @@ let blob_of_pubkey pk =
     | Hostkey.Ed25519_pub pub ->
       let pub_cs = Mirage_crypto_ec.Ed25519.pub_to_cstruct pub in
       put_string (Cstruct.to_string pub_cs) buf
+    | Hostkey.P256_pub pub ->
+      let pub_cs = Mirage_crypto_ec.P256.Dsa.pub_to_cstruct pub in
+      put_string "nistp256" buf |>
+      put_cstring pub_cs
+    | Hostkey.P384_pub pub ->
+      let pub_cs = Mirage_crypto_ec.P384.Dsa.pub_to_cstruct pub in
+      put_string "nistp384" buf |>
+      put_cstring pub_cs
+    | Hostkey.P521_pub pub ->
+      let pub_cs = Mirage_crypto_ec.P521.Dsa.pub_to_cstruct pub in
+      put_string "nistp521" buf |>
+      put_cstring pub_cs
   in
   Dbuf.to_cstruct buf'
 
@@ -150,6 +162,31 @@ let pubkey_of_blob blob =
         (Mirage_crypto_ec.Ed25519.pub_of_cstruct cs)
     in
     Ok (Hostkey.Ed25519_pub pubkey)
+  | "ecdsa-sha2-nistp256" | "ecdsa-sha2-nistp384" | "ecdsa-sha2-nistp521" ->
+    let offset = 11 (* String.length "ecdsa-sha2-" *) in
+    let curve = String.sub key_alg offset (String.length key_alg - offset) in
+    let* curve', blob = get_string blob in
+    let* q, _ = get_cstring blob in
+    let* () =
+      if String.equal curve curve' then Ok () else
+        Error "Bad curve"
+    in
+    let open Mirage_crypto_ec in
+    begin match curve with
+      | "nistp256" ->
+        Result.fold (P256.Dsa.pub_of_cstruct q)
+          ~error:(fun e -> Error (Fmt.to_to_string pp_error e))
+          ~ok:(fun pubkey -> Ok (Hostkey.P256_pub pubkey))
+      | "nistp384" ->
+        Result.fold (P384.Dsa.pub_of_cstruct q)
+          ~error:(fun e -> Error (Fmt.to_to_string pp_error e))
+          ~ok:(fun pubkey -> Ok (Hostkey.P384_pub pubkey))
+      | "nistp521" ->
+        Result.fold (P521.Dsa.pub_of_cstruct q)
+          ~error:(fun e -> Error (Fmt.to_to_string pp_error e))
+          ~ok:(fun pubkey -> Ok (Hostkey.P521_pub pubkey))
+      | _ -> assert false
+    end
   | k -> Error ("unsupported key algorithm: " ^ k)
 
 (* Prefer using get_pubkey_alg always *)
@@ -783,6 +820,9 @@ let put_message msg buf =
            | None -> match pubkey with
              | Hostkey.Rsa_pub _ -> Hostkey.Rsa_sha1
              | Hostkey.Ed25519_pub _ -> Hostkey.Ed25519
+             | Hostkey.P256_pub _ -> Hostkey.P256
+             | Hostkey.P384_pub _ -> Hostkey.P384
+             | Hostkey.P521_pub _ -> Hostkey.P521
          in
          put_string "publickey" buf |>
          put_bool (is_some signature) |>

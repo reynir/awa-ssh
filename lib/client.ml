@@ -136,6 +136,8 @@ let make ?(authenticator = `No_authentication) ~user auth_method =
     | `No_authentication -> Hostkey.preferred_algs
     | `Key Hostkey.Rsa_pub _ -> Hostkey.algs_of_typ `Rsa
     | `Key Hostkey.Ed25519_pub _ -> Hostkey.algs_of_typ `Ed25519
+    | `Key (Hostkey.P256_pub _ | Hostkey.P384_pub _ | Hostkey.P521_pub _) ->
+      [] (* FIXME *)
     | `Fingerprint (typ, _) -> Hostkey.algs_of_typ typ
   in
   let client_kexinit = Kex.make_kexinit hostkey_algs Kex.client_supported () in
